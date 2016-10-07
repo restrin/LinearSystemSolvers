@@ -1,4 +1,4 @@
-function [ x, iter, resvec ] = spqmrns( A, Z1, Z2, f, tol, maxiter, M )
+function [ x, iter, resvec ] = spqmrns( A, H1, H2, f, tol, maxiter, M )
 
 % SPMR-SC solves saddle-point systems (for x only) of the form
 % [A G1'][x] = [f]
@@ -7,14 +7,14 @@ function [ x, iter, resvec ] = spqmrns( A, Z1, Z2, f, tol, maxiter, M )
 % Recovering y needs to be done outside of the method.
 %
 % The input arguments to be passed in are:
-%   A       : a function A(x,t) such that
+%   A       : matrix or a function A(x,t) such that
 %              A(x,1) = A *x
 %              A(x,2) = A'*x
-%   Z1      : a function Z1(x,t) such that
+%   H1      : matrix or a function Z1(x,t) such that
 %              Z1(x,1) = Z1 *x
 %              Z1(x,2) = Z1'*x
 %             where Z1 is a null-space basis for G1
-%   Z2      : a function Z2(x,t) such that
+%   H2      : matrix or a function Z2(x,t) such that
 %              Z2(x,1) = Z2 *x
 %              Z2(x,2) = Z2'*x
 %             where Z2 is a null-space basis for G2
@@ -22,7 +22,7 @@ function [ x, iter, resvec ] = spqmrns( A, Z1, Z2, f, tol, maxiter, M )
 %   tol     : the relative residual tolerance. Default is 1e-6.
 %   maxiter : maximum number of iterations. Default is 20.
 %   M       : a symmetric-positive definite preconditioner, accessible
-%             as a function
+%             as a function or matrix
 %               M(x) = M\x
 %
 % The output variables are
@@ -32,6 +32,37 @@ function [ x, iter, resvec ] = spqmrns( A, Z1, Z2, f, tol, maxiter, M )
 %   resvec  : a vector of length iter containing estimates of |rk|/|b|
 %             where |rk| is the kth residual norm
 
+if isa(A,'numeric')
+    explicitA = true;
+elseif isa(A,'function_handle')
+    explicitA = false;
+else
+    error('spqmrns:Atype','%s','A must be numeric or a function handle');
+end
+
+if isa(H1,'numeric')
+    explicitH1 = true;
+elseif isa(H1,'function_handle')
+    explicitH1 = false;
+else
+    error('spqmrns:H1type','%s','H1 must be numeric or a function handle');
+end
+
+if isa(H2,'numeric')
+    explicitH2 = true;
+elseif isa(H2,'function_handle')
+    explicitH2 = false;
+else
+    error('spqmrns:H2type','%s','H2 must be numeric or a function handle');
+end
+
+if isa(M,'numeric')
+    explicitM = true;
+elseif isa(M,'function_handle')
+    explicitM = false;
+else
+    error('spqmrns:Mtype','%s','M must be numeric or a function handle');
+end
 
 if nargin < 5 || isempty(tol)      , tol     = 1e-6;       end
 if nargin < 6 || isempty(maxiter)  , maxiter = 20;         end
@@ -41,15 +72,15 @@ else
     precond = 1;
 end
 
-n = length(f);
+%n = length(f);
 resvec = zeros(maxiter,1);
-Zf = -Z1(f,2);
-m = length(Zf);
-nf = norm(Zf);
+if explicitH1, Hf = -H1'*f; else Hf = -H1(f,2); end
+m = length(Hf);
+nf = norm(Hf);
 
-z = Zf;
+z = Hf;
 if precond
-    Mz = M(z);
+    if explicitM, Mz = M\z; else Mz = M(z); end
 else
     Mz = z;
 end
@@ -58,15 +89,14 @@ z = z/beta1;
 v = z;
 Mz = Mz/beta1;
 if precond
-    Mv = M(v);
+    if explicitM, Mv = M\v; else Mv = M(v); end
 else
     Mv = v;
 end
 
-u = Z2(Mv,1);
-w = Z1(Mz,1);
-Au = A*u;
-Aw = A'*w;
+if explicitH2, u = H2*Mv; else u = H2(Mv,1); end
+if explicitH1, w = H1*Mz; else w = H1(Mz,1); end
+if explicitA, Au = A*u; Aw = A'*w; else Au = A(u,1); Aw = A(w,2); end
 alphgam = w'*Au;
 Jold = sign(alphgam);
 alpha = sqrt(abs(alphgam));
@@ -94,17 +124,25 @@ iter = maxiter;
 
 for k = 1:maxiter
     % Get next v and z
-    vv = Jold*Z1(Au,2)/alpha;
+    if explicitH1
+        vv = Jold*H1'*Au/alpha;
+    else
+        vv = Jold*H1(Au,2)/alpha;
+    end
     v = vv - gamma*v;
     if precond
-        Mv = M(v);
+        if explicitM, Mv = M\v; else Mv = M(v); end
     else
         Mv = v;
     end
-    zz = Jold*Z2(Aw,2)/gamma;
+    if explicitH2
+        zz = Jold*H2'*Aw/gamma;
+    else
+        zz = Jold*H2(Aw,2)/gamma;
+    end
     z = zz - alpha*z;
     if precond
-        Mz = M(z);
+        if explicitM, Mz = M\z; else Mz = M(z); end
     else
         Mz = z;
     end
@@ -116,10 +154,17 @@ for k = 1:maxiter
     %============
 
     % Get next u and w
-    u = Z2(Mv,1)/delta - Jold*beta*u;
-    w = Z1(Mz,1)/beta - Jold*delta*w;
-    Au = A*u;
-    Aw = A'*w;
+    if explicitH2
+        u = H2*Mv/delta - Jold*beta*u;
+    else
+        u = H2(Mv,1)/delta - Jold*beta*u;
+    end
+    if explicitH1
+        w = H1*Mz/beta - Jold*delta*w;
+    else
+        w = H1(Mz,1)/beta - Jold*delta*w;
+    end
+    if explicitA, Au = A*u; Aw = A'*w; else Au = A(u,1); Aw = A(w,2); end
     alphgam = w'*Au;
     J = sign(alphgam);
     alpha = sqrt(abs(alphgam));
@@ -149,7 +194,7 @@ for k = 1:maxiter
     normr = normr*s;
     resvec(k) = normr*sqrt(k);
     if (normr*sqrt(k) < tol)
-        if( norm(Z1(A*p,2) - Zf) < tol*nf )    
+        if( norm(H1(A*p,2) - Hf) < tol*nf )    
             iter = k;
             break;
         end

@@ -7,14 +7,14 @@ function [ x, iter, resvec ] = spmrns( A, H1, H2, f, tol, maxiter, M )
 % Recovering y needs to be done outside of the method.
 %
 % The input arguments to be passed in are:
-%   A       : a function A(x,t) such that
+%   A       : matrix or function A(x,t) such that
 %              A(x,1) = A *x
 %              A(x,2) = A'*x
-%   H1      : a function H1(x,t) such that
+%   H1      : matrix or function H1(x,t) such that
 %              H1(x,1) = H1 *x
 %              H1(x,2) = H1'*x
 %             where Z1 is a null-space basis for G1
-%   H2      : a function H2(x,t) such that
+%   H2      : matrix or function H2(x,t) such that
 %              H2(x,1) = H2 *x
 %              H2(x,2) = H2'*x
 %             where Z2 is a null-space basis for G2
@@ -22,7 +22,7 @@ function [ x, iter, resvec ] = spmrns( A, H1, H2, f, tol, maxiter, M )
 %   tol     : the relative residual tolerance. Default is 1e-6.
 %   maxiter : maximum number of iterations. Default is 20.
 %   M       : a symmetric-positive definite preconditioner, accessible
-%             as a function
+%             as a function or matrix
 %               M(x) = M\x
 %
 % The output variables are
@@ -32,6 +32,38 @@ function [ x, iter, resvec ] = spmrns( A, H1, H2, f, tol, maxiter, M )
 %   resvec  : a vector of length iter containing estimates of |rk|/|b|
 %             where |rk| is the kth residual norm
 
+
+if isa(A,'numeric')
+    explicitA = true;
+elseif isa(A,'function_handle')
+    explicitA = false;
+else
+    error('spmrns:Atype','%s','A must be numeric or a function handle');
+end
+
+if isa(H1,'numeric')
+    explicitH1 = true;
+elseif isa(H1,'function_handle')
+    explicitH1 = false;
+else
+    error('spmrns:H1type','%s','H1 must be numeric or a function handle');
+end
+
+if isa(H2,'numeric')
+    explicitH2 = true;
+elseif isa(H2,'function_handle')
+    explicitH2 = false;
+else
+    error('spmrns:H2type','%s','H2 must be numeric or a function handle');
+end
+
+if isa(M,'numeric')
+    explicitM = true;
+elseif isa(M,'function_handle')
+    explicitM = false;
+else
+    error('spmrns:Mtype','%s','M must be numeric or a function handle');
+end
 
 if nargin < 5 || isempty(tol)      , tol     = 1e-6;       end
 if nargin < 6 || isempty(maxiter)  , maxiter = 20;         end
@@ -44,9 +76,9 @@ end
 n = length(f);
 resvec = zeros(maxiter,1);
 
-z = -H1(f,2);
+if explicitH1, z = -H1'*f; else z = -H1(f,2); end;
 if precond
-    Mz = M(z);
+    if explicitM, Mz = M\z; else Mz = M(z); end
 else
     Mz = z;
 end
@@ -55,15 +87,14 @@ z = z/beta1;
 v = z;
 Mz = Mz/beta1;
 if precond
-    Mv = M(v);
+    if explicitM, Mv = M\v; else Mv = M(v); end
 else
     Mv = v;
 end
 
-u = H2(Mv,1);
-w = H1(Mz,1);
-Au = A*u;
-Aw = A'*w;
+if explicitH2, u = H2*Mv; else u = H2(Mv,1); end
+if explicitH1, w = H1*Mz; else w = H1(Mz,1); end
+if explicitA, Au = A*u; Aw = A'*w; else Au = A(u,1); Aw = A(w,2); end
 alphgam = w'*Au;
 Jold = sign(alphgam);
 alpha = sqrt(abs(alphgam));
@@ -84,27 +115,35 @@ phiold = beta1;
 ww = u;
 
 % Residual estimation
-normr = 1; % ||r||/||b||
+normr = beta1; % ||r||/||b||
 
 % Iteration count
 iter = maxiter;
 
 for k = 1:maxiter
     % Get next v and z
-    vv = Jold*H2(Aw,2)/gamma;
+    if explicitH2
+        vv = Jold*H2'*Aw/gamma;
+    else
+        vv = Jold*H2(Aw,2)/gamma;
+    end
     v = vv - alpha*v;
     if precond
-        Mv = M(v);
+        if explicitM, Mv = M\v; else Mv = M(v); end
     else
         Mv = v;
     end
     beta = sqrt(v'*Mv);
     v = v/beta;
     
-    zz = Jold*H1(Au,2)/alpha;
+    if explicitH1
+        zz = Jold*H1'*Au/alpha;
+    else
+        zz = Jold*H1(Au,2)/alpha;
+    end
     z = zz - gamma*z;
     if precond
-        Mz = M(z);
+        if explicitM, Mz = M\z; else Mz = M(z); end
     else
         Mz = z;
     end
@@ -113,10 +152,17 @@ for k = 1:maxiter
     %============
 
     % Get next u and w
-    u = H2(Mv,1)/beta - Jold*beta*u;
-    w = H1(Mz,1)/delta - Jold*delta*w;
-    Au = A*u;
-    Aw = A'*w;
+    if explicitH2
+        u = H2*Mv/beta - Jold*beta*u;
+    else
+        u = H2(Mv,1)/beta - Jold*beta*u;
+    end
+    if explicitH1
+        w = H1*Mz/delta - Jold*delta*w;
+    else
+        w = H1(Mz,1)/delta - Jold*delta*w;
+    end
+    if explicitA, Au = A*u; Aw = A'*w; else Au = A(u,1); Aw = A(w,2); end
     alphgam = w'*Au;
     J = sign(alphgam);
     alpha = sqrt(abs(alphgam));

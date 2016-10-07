@@ -6,20 +6,20 @@ function [ x, y, iter, resvec ] = spmrsc( A, G1, G2, g, tol, maxiter, M )
 % where A is a nonsingular n-by-n matrix, and G1,G2 are m-by-n matrices.
 %
 % The input arguments to be passed in are:
-%   A       : a function A(x,t) such that
+%   A       : matrix or a function A(x,t) such that
 %              A(x,1) = A \x
 %              A(x,2) = A'\x
-%   G1      : a function G1(x,t) such that
+%   G1      : matrix or a function G1(x,t) such that
 %              G1(x,1) = G1 *x
 %              G1(x,2) = G1'*x
-%   G2      : a function G2(x,t) such that
+%   G2      : matrix or a function G2(x,t) such that
 %              G2(x,1) = G2 *x
 %              G2(x,2) = G2'*x
 %   g       : an m-vector
 %   tol     : the relative residual tolerance. Default is 1e-6.
 %   maxiter : maximum number of iterations. Default is 20.
 %   M       : a symmetric-positive definite preconditioner, accessible
-%             as a function
+%             as a function or matrix
 %               M(x) = M\x
 %
 % The output variables are
@@ -28,6 +28,38 @@ function [ x, y, iter, resvec ] = spmrsc( A, G1, G2, g, tol, maxiter, M )
 %   iter    : number of iterations
 %   resvec  : a vector of length iter containing estimates of |rk|/|b|
 %             where |rk| is the kth residual norm
+
+if isa(A,'numeric')
+    explicitA = true;
+elseif isa(A,'function_handle')
+    explicitA = false;
+else
+    error('spmrsc:Atype','%s','A must be numeric or a function handle');
+end
+
+if isa(H1,'numeric')
+    explicitG1 = true;
+elseif isa(G1,'function_handle')
+    explicitG1 = false;
+else
+    error('spmrsc:G1type','%s','H1 must be numeric or a function handle');
+end
+
+if isa(G2,'numeric')
+    explicitG2 = true;
+elseif isa(G2,'function_handle')
+    explicitG2 = false;
+else
+    error('spmrsc:G2type','%s','H2 must be numeric or a function handle');
+end
+
+if isa(M,'numeric')
+    explicitM = true;
+elseif isa(M,'function_handle')
+    explicitM = false;
+else
+    error('spmrsc:Mtype','%s','M must be numeric or a function handle');
+end
 
 if nargin < 5 || isempty(tol)      , tol     = 1e-6;       end
 if nargin < 6 || isempty(maxiter)  , maxiter = 20;         end
@@ -44,7 +76,7 @@ resvec = zeros(maxiter,1);
 % First iteration
 z = g;
 if precond
-    Mz = M(z);
+    if explicitM, Mz = M\z; else Mz = M(z); end
 else
     Mz = z;
 end
@@ -53,15 +85,15 @@ z = z/beta1;
 v = z;
 Mz = Mz/beta1;
 if precond
-    Mv = M(v);
+    if explicitM, Mv = M\v; else Mv = M(v); end
 else
     Mv = v;
 end
 
-Gv = G1(Mv,2);
-u = A(Gv,1);
-Gz = G2(Mz,2);
-w = A(Gz,2);
+if explicitG1, Gv = G1'*Mv; else Gv = G1(Mv,2); end
+if explicitA , u = A\Gv;    else u = A(Gv,1);   end
+if explicitG2, Gz = G2'*Mz; else Gz = G2(Mz,2); end
+if explicitA , w = A'\Gz;   else w = A(Gz,2);   end
 alphgam = w'*Gv;
 Jold = sign(alphgam);
 alpha = sqrt(abs(alphgam));
@@ -100,18 +132,18 @@ iter = maxiter;
 
 for k = 1:maxiter
     % Get next v and z
-    v = G1(w,1) - alpha*v;
+    if explicitG1, v = G1*w - alpha*v; else v = G1(w,1) - alpha*v; end
     if precond
-        Mv = M(v);
+        if explicitM, Mv = M\v; else Mv = M(v); end
     else
         Mv = v;
     end
     beta = sqrt(v'*Mv);
     v = v/beta;
     
-    z = G2(u,1) - gamma*z;
+    if explicitG2, z = G2*u - gamma*z; else z = G2(u,1) - gamma*z; end
     if precond
-        Mz = M(z);
+        if explicitM, Mz = M\z; else Mz = M(z); end
     else
         Mz = z;
     end
@@ -120,10 +152,10 @@ for k = 1:maxiter
     %============
     
     % Get next u and w
-    Gv = (G1(Mv,2))/beta;
-    u = A(Gv,1) - Jold*beta*u;
-    Gz = (G2(Mz,2))/delta;
-    w = A(Gz,2) - Jold*delta*w;
+    if explicitG1, Gv = G1'*Mv/beta;         else Gv = (G1(Mv,2))/beta;       end
+    if explicitA , u = A\Gv - Jold*beta*u;   else u = A(Gv,1) - Jold*beta*u;  end
+    if explicitG2, Gz = G2'*Mz/delta;        else Gz = (G2(Mz,2))/delta;      end
+    if explicitA , w = A'\Gz - Jold*delta*w; else w = A(Gz,2) - Jold*delta*w; end
     alphgam = w'*Gv;
     J = sign(alphgam);
     alpha = sqrt(abs(alphgam));
