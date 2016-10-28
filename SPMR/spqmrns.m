@@ -1,4 +1,4 @@
-function [ x, iter, resvec ] = spqmrns( A, H1, H2, f, tol, maxiter, M )
+function [ x, flag, iter, resvec ] = spqmrns( A, H1, H2, f, tol, maxiter, M )
 
 % SPMR-SC solves saddle-point systems (for x only) of the form
 % [A G1'][x] = [f]
@@ -27,10 +27,25 @@ function [ x, iter, resvec ] = spqmrns( A, H1, H2, f, tol, maxiter, M )
 %
 % The output variables are
 %   x       : an n-vector
-%   y       : an m-vector
+%   flag    : flag indicating result:
+%              0 : residual norm is below tol
+%              1 : ran maxit iterations but did not converge
+%              2 : some computed quantity became too small
 %   iter    : number of iterations
 %   resvec  : a vector of length iter containing estimates of |rk|/|b|
 %             where |rk| is the kth residual norm
+
+if nargin < 4
+    error('spqmrns:args','%s','Not enough input arguments');
+end
+
+if nargin < 5 || isempty(tol)      , tol     = 1e-6;       end
+if nargin < 6 || isempty(maxiter)  , maxiter = 20;         end
+if nargin < 7 || isempty(M) 
+    precond = 0;       
+else
+    precond = 1;
+end
 
 if isa(A,'numeric')
     explicitA = true;
@@ -56,21 +71,19 @@ else
     error('spqmrns:H2type','%s','H2 must be numeric or a function handle');
 end
 
-if isa(M,'numeric')
-    explicitM = true;
-elseif isa(M,'function_handle')
-    explicitM = false;
-else
-    error('spqmrns:Mtype','%s','M must be numeric or a function handle');
+if precond
+    if isa(M,'numeric')
+        explicitM = true;
+    elseif isa(M,'function_handle')
+        explicitM = false;
+    else
+        error('spmrns:Mtype','%s','M must be numeric or a function handle');
+    end
 end
 
-if nargin < 5 || isempty(tol)      , tol     = 1e-6;       end
-if nargin < 6 || isempty(maxiter)  , maxiter = 20;         end
-if nargin < 7 || isempty(M) 
-    precond = 0;       
-else
-    precond = 1;
-end
+flag = 1;
+% tolerance before quantity considered too small (arbitrary for now)
+eps = 1e-12;
 
 %n = length(f);
 resvec = zeros(maxiter,1);
@@ -98,6 +111,12 @@ if explicitH2, u = H2*Mv; else u = H2(Mv,1); end
 if explicitH1, w = H1*Mz; else w = H1(Mz,1); end
 if explicitA, Au = A*u; Aw = A'*w; else Au = A(u,1); Aw = A(w,2); end
 alphgam = w'*Au;
+if (abs(alphgam) < eps)
+    x = 0;
+    flag = 2;
+    iter = 0;
+    return;
+end
 Jold = sign(alphgam);
 alpha = sqrt(abs(alphgam));
 gamma = alpha;
@@ -166,6 +185,10 @@ for k = 1:maxiter
     end
     if explicitA, Au = A*u; Aw = A'*w; else Au = A(u,1); Aw = A(w,2); end
     alphgam = w'*Au;
+    if (abs(alphgam) < eps)
+        flag = 2;
+        break;
+    end
     J = sign(alphgam);
     alpha = sqrt(abs(alphgam));
     gamma = alpha;
@@ -194,7 +217,8 @@ for k = 1:maxiter
     normr = normr*s;
     resvec(k) = normr*sqrt(k);
     if (normr*sqrt(k) < tol)
-        if( norm(H1(A*p,2) - Hf) < tol*nf )    
+        if( norm(H1(A*p,2) - Hf) < tol*nf )  
+            flag = 0;
             iter = k;
             break;
         end

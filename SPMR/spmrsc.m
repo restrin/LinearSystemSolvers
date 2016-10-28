@@ -1,4 +1,4 @@
-function [ x, y, iter, resvec ] = spmrsc( A, G1, G2, g, tol, maxiter, M )
+function [ x, y, flag, iter, resvec ] = spmrsc( A, G1, G2, g, tol, maxiter, M )
 
 % SPMR-SC solves saddle-point systems of the form
 % [A G1'][x] = [0]
@@ -25,9 +25,25 @@ function [ x, y, iter, resvec ] = spmrsc( A, G1, G2, g, tol, maxiter, M )
 % The output variables are
 %   x       : an n-vector
 %   y       : an m-vector
+%   flag    : flag indicating result:
+%              0 : residual norm is below tol
+%              1 : ran maxit iterations but did not converge
+%              2 : some computed quantity became too small
 %   iter    : number of iterations
 %   resvec  : a vector of length iter containing estimates of |rk|/|b|
 %             where |rk| is the kth residual norm
+
+if nargin < 4
+    error('spmrsc:args','%s','Not enough input arguments');
+end
+
+if nargin < 5 || isempty(tol)      , tol     = 1e-6;       end
+if nargin < 6 || isempty(maxiter)  , maxiter = 20;         end
+if nargin < 7 || isempty(M) 
+    precond = 0;       
+else
+    precond = 1;
+end
 
 if isa(A,'numeric')
     explicitA = true;
@@ -37,7 +53,7 @@ else
     error('spmrsc:Atype','%s','A must be numeric or a function handle');
 end
 
-if isa(H1,'numeric')
+if isa(G1,'numeric')
     explicitG1 = true;
 elseif isa(G1,'function_handle')
     explicitG1 = false;
@@ -53,21 +69,19 @@ else
     error('spmrsc:G2type','%s','H2 must be numeric or a function handle');
 end
 
-if isa(M,'numeric')
-    explicitM = true;
-elseif isa(M,'function_handle')
-    explicitM = false;
-else
-    error('spmrsc:Mtype','%s','M must be numeric or a function handle');
+if precond
+    if isa(M,'numeric')
+        explicitM = true;
+    elseif isa(M,'function_handle')
+        explicitM = false;
+    else
+        error('spmrns:Mtype','%s','M must be numeric or a function handle');
+    end
 end
 
-if nargin < 5 || isempty(tol)      , tol     = 1e-6;       end
-if nargin < 6 || isempty(maxiter)  , maxiter = 20;         end
-if nargin < 7 || isempty(M) 
-    precond = 0;       
-else
-    precond = 1;
-end
+flag = 1;
+% tolerance before quantity considered too small (arbitrary for now)
+eps = 1e-12;
 
 m = length(g);
 
@@ -95,6 +109,14 @@ if explicitA , u = A\Gv;    else u = A(Gv,1);   end
 if explicitG2, Gz = G2'*Mz; else Gz = G2(Mz,2); end
 if explicitA , w = A'\Gz;   else w = A(Gz,2);   end
 alphgam = w'*Gv;
+if (abs(alphgam) < eps)
+    x = 0;
+    y = 0;
+    flag = 2;
+    iter = 0;
+    return;
+end
+
 Jold = sign(alphgam);
 alpha = sqrt(abs(alphgam));
 gamma = alpha;
@@ -157,6 +179,10 @@ for k = 1:maxiter
     if explicitG2, Gz = G2'*Mz/delta;        else Gz = (G2(Mz,2))/delta;      end
     if explicitA , w = A'\Gz - Jold*delta*w; else w = A(Gz,2) - Jold*delta*w; end
     alphgam = w'*Gv;
+    if (abs(alphgam) < eps)
+        flag = 2;
+        break;
+    end
     J = sign(alphgam);
     alpha = sqrt(abs(alphgam));
     gamma = alpha;
@@ -197,6 +223,7 @@ for k = 1:maxiter
     resvec(k) = normr;
     if (normr < tol)
         iter = k;
+        flag = 0;
         break;
     end
     %============
@@ -210,7 +237,9 @@ for k = 1:maxiter
 end
 
 % Recover y
-if precond == 1, y = M(y); end
+if precond
+    if explicitM, y = M\y; else y = M(y); end
+end
 resvec = resvec(1:iter);
 
 end
