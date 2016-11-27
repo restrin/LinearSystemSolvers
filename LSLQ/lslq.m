@@ -251,6 +251,8 @@ function [x, xcg, flag, it, normr, normAr, resvec, resvecAr, errvec, errveccg] =
       
       if (it > 1 && sigma > 0)
           errveccg(it) = sqrt(zetatilde^2 - zetabar^2);
+          
+          test4 = (errveccg(it) <= etol);
       end
       
       % Check if should exit
@@ -291,8 +293,6 @@ function [x, xcg, flag, it, normr, normAr, resvec, resvecAr, errvec, errveccg] =
           tautilde = -tau*delta/omega;
           zetatilde = (tautilde - zeta*etatilde)/epstilde;
           errvec(it+1) = zetatilde;
-          
-          test4 = (zetatilde <= etol); % Exit later
       end
       
       it = it+1;
