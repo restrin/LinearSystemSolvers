@@ -97,7 +97,7 @@ function [x, xcg, flag, it, normr, normAr, resvec, resvecAr, errvec, errveccg] =
 
   if explicitA
     v = A'*u;
-    [m n] = size(A);
+    [m, n] = size(A);
   else  
     v = A(u,2);
     m = size(b,1);

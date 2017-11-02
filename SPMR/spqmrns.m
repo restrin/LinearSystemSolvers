@@ -85,7 +85,7 @@ flag = 1;
 % tolerance before quantity considered too small (arbitrary for now)
 eps = 1e-12;
 
-%n = length(f);
+n = length(f);
 resvec = zeros(maxiter,1);
 if explicitH1, Hf = -H1'*f; else Hf = -H1(f,2); end
 m = length(Hf);
@@ -126,7 +126,7 @@ w = Jold*w/gamma;
 beta = 0;
 delta = 0;
 
-p = zeros(m,1);
+p = zeros(n,1);
 
 % QR factorization of C_k
 rhobar = gamma;
@@ -217,7 +217,12 @@ for k = 1:maxiter
     normr = normr*s;
     resvec(k) = normr*sqrt(k);
     if (normr*sqrt(k) < tol)
-        if( norm(H1(A*p,2) - Hf) < tol*nf )  
+        if explicitH1
+            nr = norm(H1'*A*p - Hf);
+        else
+            nr = norm(H1(A*p,2) - Hf); 
+        end
+        if( nr < tol*nf )  
             flag = 0;
             iter = k;
             break;

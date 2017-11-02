@@ -1,4 +1,4 @@
-function [ x, iter, flag, resvec ] = spmrns( A, H1, H2, f, tol, maxiter, M )
+function [ x, flag, iter, resvec ] = spmrns( A, H1, H2, f, tol, maxiter, M )
 
 % SPMR-SC solves saddle-point systems (for x only) of the form
 % [A G1'][x] = [f]
