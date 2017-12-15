@@ -110,6 +110,20 @@ function [x, y, flag, it, normr, resvec, errvec] = ...
   normb = beta;
   if beta > 0
     p  = p/beta;
+  else
+      % Zero solution
+      y = zeros(size(b));
+      if explicitA
+        x = zeros(size(A,2));
+      else
+        x = A(y,2);
+      end
+      flag = 0;
+      it = 1;
+      normr = 0;
+      resvec = 0;
+      errvec = 0;
+      return
   end
 
   if explicitA
@@ -310,7 +324,7 @@ function [x, y, flag, it, normr, resvec, errvec] = ...
           err = sqrt(err_x^2 + err_y^2);
 
           errvec(it) = err;
-          test4 = (err < etol);
+          test4 = (err < etol * sqrt(normx2));
       end
 
       if( test0 + test1 + test4 > 0 )
