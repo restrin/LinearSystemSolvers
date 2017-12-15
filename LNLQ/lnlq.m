@@ -324,7 +324,7 @@ function [x, y, flag, it, normr, resvec, errvec] = ...
           err = sqrt(err_x^2 + err_y^2);
 
           errvec(it) = err;
-          test4 = (err < etol * sqrt(normx2));
+          test4 = (err < etol * max(sqrt(normx2),1));
       end
 
       if( test0 + test1 + test4 > 0 )
