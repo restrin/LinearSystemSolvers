@@ -1,5 +1,5 @@
-function [x, y, flag, it, normr, resvec, errvec] = ...
-    lnlq( A, b, atol, btol, etol, conlim, maxit, M, lambda, sigma )
+function [x, y, flag, it, normr, resvec, errvec, errvecy] = ...
+    lnlq( A, b, atol, btol, etol, conlim, maxit, M, lambda, sigma, d )
 % LNLQ Least-Norm LQ method
 %   X = LNLQ(A,B) attempts to solve the system of linear equations
 %   [I       A'   ][X] = [0]
@@ -146,6 +146,7 @@ function [x, y, flag, it, normr, resvec, errvec] = ...
   if nargin < 7  || isempty(maxit)    , maxit     = min(minDim, 20); end
   if nargin < 9  || isempty(lambda)   , lambda    = 0;               end
   if nargin < 10 || isempty(sigma)    , sigma     = 0;               end
+  if nargin < 11 || isempty(d)        , d         = 0;               end
 
   flag = 1;
   sigmax = 0;
@@ -193,6 +194,12 @@ function [x, y, flag, it, normr, resvec, errvec] = ...
   % Initial values for yL
   zetabar = tau/epsbar;
   wbar = p;
+  
+  z_list = zeros(d,1);
+  c_list = zeros(d,1);
+  s_prod = ones(d,1);
+  
+  errvecy = zeros(maxit+1,1);
   
   while 1
 
@@ -310,6 +317,34 @@ function [x, y, flag, it, normr, resvec, errvec] = ...
       test4 = 0;
 %      test2 = (sigmax/sigmin >= conlim);
 
+      % Sliding window part of error estimate
+      if d > 0 && sigma > 0
+          ix = mod(it-1,d)+1;
+          c_list(ix) = c;
+          z_list(ix) = zeta;
+
+          if it > d
+              ix = mod(it-1,d)+1;
+              jx = mod(ix,d)+1;
+
+              zetabark = z_list(jx)/c_list(jx);
+              theta = abs(c_list'*(s_prod.*z_list));
+              theta = zetabark*theta ...
+                  + abs(zetabark*zetabar*s_prod(ix)*s) ...
+                  - zetabark^2;
+
+              errvecy(it-d) = sqrt(errvecy(it-d)^2 - 2*theta);
+          end
+
+          ix = mod(it-1,d)+1;
+          if it < d
+             s_prod(it+1:end) = s_prod(it+1:end)*s; 
+          else
+             s_prod = s_prod/s_prod(mod(ix+1,d)+1);
+             s_prod(mod(ix,d)+1) = s_prod(ix)*s; 
+          end
+      end
+      
       if( sigma > 0 )
           % Error estimate in x
           err_x = sqrt(tautilde^2 - tau^2);
@@ -320,6 +355,7 @@ function [x, y, flag, it, normr, resvec, errvec] = ...
           zetatilde = (tautilde - etatilde*zeta)/epstilde;
           
           err_y = sqrt(zetatilde^2 - zetabar^2);
+          errvecy(it) = err_y; % DELETE THIS LATER
           
           err = sqrt(err_x^2 + err_y^2);
 
