@@ -1,4 +1,4 @@
-function [x, y, flag, it, normr, resvec, errvec, errvecy] = ...
+function [x, y, flag, it, normr, resvec, errvec] = ...
     lnlq( A, b, atol, btol, etol, conlim, maxit, M, lambda, sigma, d )
 % LNLQ Least-Norm LQ method
 %   X = LNLQ(A,B) attempts to solve the system of linear equations
@@ -20,12 +20,14 @@ function [x, y, flag, it, normr, resvec, errvec, errvecy] = ...
 %   current approximate solution X.  If A*X = B seems to be consistent,
 %   LNLQ terminates when NORM(RES) <= ATOL*NORM(A)*NORM(X) + BTOL*NORM(B).
 %
-%   [X,Y] = LNLQ(A,B,ATOL,BTOL,ETOL,...,SIGMA) continues iterations until a
-%   certain forward error estimate is satisfied. Let X* be the solution
+%   [X,Y] = LNLQ(A,B,ATOL,BTOL,ETOL,...,SIGMA,D) continues iterations until
+%   a certain forward error estimate is satisfied. Let X* be the solution
 %   then LNLQ will exit when NORM(X*-X) <= ETOL. SIGMA must be an
 %   underestimate of the smallest singular value of A. If the exact minimum
 %   singular value is known (call it S), then SIGMA should be S*(1-ETA)
-%   where ETA is O(1e-10).
+%   where ETA is O(1e-10). D >= 0 is used to improve the error estimate,
+%   where at iteration K we tighten the error for Y bound at iteration K-D 
+%   with O(D) work.
 %
 %   [X,Y] = LNLQ(A,B,ATOL,BTOL,ETOL,CONLIM) terminates if an estimate
 %   of cond(A) exceeds CONLIM. For compatible systems Ax = b,
@@ -199,8 +201,6 @@ function [x, y, flag, it, normr, resvec, errvec, errvecy] = ...
   c_list = zeros(d,1);
   s_prod = ones(d,1);
   
-  errvecy = zeros(maxit+1,1);
-  
   while 1
 
       % Golub-Kahan step
@@ -333,7 +333,7 @@ function [x, y, flag, it, normr, resvec, errvec, errvecy] = ...
                   + abs(zetabark*zetabar*s_prod(ix)*s) ...
                   - zetabark^2;
 
-              errvecy(it-d) = sqrt(errvecy(it-d)^2 - 2*theta);
+              errvec(it-d) = sqrt(errvec(it-d)^2 - 2*theta);
           end
 
           ix = mod(it-1,d)+1;
@@ -355,7 +355,6 @@ function [x, y, flag, it, normr, resvec, errvec, errvecy] = ...
           zetatilde = (tautilde - etatilde*zeta)/epstilde;
           
           err_y = sqrt(zetatilde^2 - zetabar^2);
-          errvecy(it) = err_y; % DELETE THIS LATER
           
           err = sqrt(err_x^2 + err_y^2);
 
