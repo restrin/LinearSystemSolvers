@@ -23,8 +23,6 @@ function [x, xcg, flag, it, normr, normAr, resvec, resvecAr, errvec, errveccg, e
 %   underestimate of the smallest singular value of A. If the exact minimum
 %   singular value is known (call it S), then SIGMA should be S*(1-ETA)
 %   where ETA is O(1e-10). D >= 0 is used to improve the error estimate,
-%   where at iteration K we tighten the error bound at iteration K-D with
-%   O(D) work.
 %
 %   X = LSLQ(A,B,ATOL,BTOL,ETOL,CONLIM) terminates if an estimate
 %   of cond(A) exceeds CONLIM. For compatible systems Ax = b,
@@ -69,7 +67,7 @@ function [x, xcg, flag, it, normr, normAr, resvec, resvecAr, errvec, errveccg, e
 %   residual norms at each iteration, including NORM(B-A*X0) and
 %   NORM(A'*(B-A*X0)).
 %
-%   [...,ERRVEC,ERRVECCG,ERRVECRCG] = LSLQ(A,B,...)
+%   [X,XCG,FLAG,ITER,NORMR,NORMAR,RESVEC,RESVECAR,ERRVEC] = LSLQ(A,B,...)
 %   also returns a vector of estimates of the LSLQ 2-norm error if
 %   0 < SIGMA < MIN(SVD(A)).
 
@@ -265,15 +263,15 @@ function [x, xcg, flag, it, normr, normAr, resvec, resvecAr, errvec, errveccg, e
               jx = mod(ix-1,d)+1;
               zetabark = z_list(jx)/c_list(jx); 
               
-              pix = mod(it-2,d)+1;
+              ix = mod(it-2,d)+1;
               theta = abs(c_list'*(s_prod.*z_list));
               theta = zetabark*theta ...
-                  + abs(zetabark*zetabar*s_prod(pix)*s_old) ...
+                  + abs(zetabark*zetabar*s_prod(ix)*s_old) ...
                   - zetabark^2;
 
               errveccg(it-d) = sqrt(errveccg(it-d)^2 - 2*theta);
           end
-          
+
           c_list(ix) = c;
           z_list(ix) = zeta;  
           
@@ -296,7 +294,7 @@ function [x, xcg, flag, it, normr, normAr, resvec, resvecAr, errvec, errveccg, e
           errvec(it) = abs(zetatilde);
           errveccg(it) = sqrt(zetatilde^2 - zetabar^2);
          
-          test4 = (it > d+1) && (errveccg(it-d) <= etol);
+          test4 = (errveccg(it-d) <= etol);
       end
       
       % Check if should exit
