@@ -117,7 +117,7 @@ function [x, xcg, flag, it, normr, normAr, resvec, resvecAr, errvec, errveccg, e
   if nargin < 7  || isempty(maxit)    , maxit     = min(minDim, 20); end
   if nargin < 8  || isempty(lambda)   , lambda    = 0;               end
   if nargin < 9  || isempty(sigma)    , sigma     = 0;               end
-  if nargin < 10 || isempty(d)       , d         = 0;               end
+  if nargin < 10 || isempty(d)        , d         = 0;               end
   
   sigma = sqrt(lambda^2 + sigma^2);
   
