@@ -142,6 +142,10 @@ function [x, flag, iter, normr, resvec, errvec] = ...
   zeta = 0;
   zetaold = 0;
   
+  z_list = zeros(d,1);
+  c_list = zeros(d,1);
+  s_prod = ones(d,1);
+  
   for it = 1:maxit
       if explicitA
         Ap = A * p;
@@ -162,7 +166,7 @@ function [x, flag, iter, normr, resvec, errvec] = ...
       normr = norm(r);
       resvec(it) = normr;
       test0 = normr < rtol;
-      
+
       if test0
           flag = 0;
           break;
@@ -190,71 +194,100 @@ function [x, flag, iter, normr, resvec, errvec] = ...
       
       % Error estimation below
       if eigest > 0
-      if it == 1
-          gammabar = alpha;
-          deltabar = beta;
-          
-          % QR of T
-          gamma = sqrt(gammabar^2 + beta^2);
-          c = gammabar/gamma;
-          s = beta/gamma;
-          
-          % Shifted QR
-          rhobar = alpha - eigest;
-          sigmabar = beta;
-            
-          omega = eigest + beta^2/rhobar;
-            
-          rho = sqrt(rhobar^2 + beta^2);
-          cw = rhobar/rho;
-          sw = beta/rho;
-            
-          zetabar = normb/gammabar;
-          
-          % TODO: double-check that this is okay
-          errvec(1) = sqrt(normb^2/eigest^2 - zetabar^2);
-      else
-          % QR of T
-          gammabar = s*deltabar - c*alpha;
-          delta = c*deltabar + s*alpha;
+          if it == 1
+              gammabar = alpha;
+              deltabar = beta;
 
-          % Forward substitution
-          zeta = zetabar*c;
-          zetabar = -(delta*zeta + epsilonold*zetaold)/gammabar;
+              % QR of T
+              gamma = sqrt(gammabar^2 + beta^2);
+              c = gammabar/gamma;
+              s = beta/gamma;
 
-          % Forward substitution for error
-          psi = c*deltabar + s*omega;
-          omegabar = s*deltabar - c*omega;
-          zetatilde = -(epsilonold*zetaold + psi*zeta)/omegabar;
-                        
-          errvec(it) = sqrt(zetatilde^2 - zetabar^2);
-          if errvec(it) < etol
-              flag = 4;
-              break;
+              % Shifted QR
+              rhobar = alpha - eigest;
+              sigmabar = beta;
+
+              omega = eigest + beta^2/rhobar;
+
+              rho = sqrt(rhobar^2 + beta^2);
+              cw = rhobar/rho;
+              sw = beta/rho;
+
+              zetabar = normb/gammabar;
+              zetatilde = normb / eigest;
+              
+              errvec(1) = sqrt(zetatilde^2 - zetabar^2);
+          else
+              % QR of T
+              gammabar = s*deltabar - c*alpha;
+              delta = c*deltabar + s*alpha;
+
+              % Forward substitution
+              zeta = zetabar*c;
+              zetabar = -(delta*zeta + epsilonold*zetaold)/gammabar;
+
+              % Sliding window part of error estimate
+              if d > 0 && eigest > 0
+                  ix = mod(it-2,d)+1;
+                  c_list(ix) = c;
+                  z_list(ix) = zeta;
+
+                  if it > d
+                      ix = mod(it-2,d)+1;
+                      jx = mod(ix,d)+1;
+
+                      zetabark = z_list(jx)/c_list(jx);
+                      theta = abs(c_list'*(s_prod.*z_list));
+                      theta = zetabark*theta ...
+                          + abs(zetabark*zetabar*s_prod(ix)*s) ...
+                          - zetabark^2;
+
+                      errvec(it-d) = sqrt(errvec(it-d)^2 - 2*theta);
+                  end
+
+                  ix = mod(it-2,d)+1;
+                  if it < d
+                     s_prod(it:end) = s_prod(it:end)*s; 
+                  else
+                     s_prod = s_prod/s_prod(mod(ix+1,d)+1);
+                     s_prod(mod(ix,d)+1) = s_prod(ix)*s; 
+                  end
+              end
+              
+              % Forward substitution for error
+              psi = c*deltabar + s*omega;
+              omegabar = s*deltabar - c*omega;
+              zetatilde = -(epsilonold*zetaold + psi*zeta)/omegabar;
+
+              errvec(it) = sqrt(zetatilde^2 - zetabar^2);
+              if errvec(it) < etol
+                  flag = 4;
+                  break;
+              end
+
+              % Continue QR
+              epsilon = s*beta;
+              deltabar = -c*beta;
+
+              gamma = sqrt(gammabar^2 + beta^2);
+              c = gammabar/gamma;
+              s = beta/gamma;
+
+              % Shifted QR
+              rhobar = sw*sigmabar - cw*(alpha - eigest);
+              sigmabar = -cw*beta;
+
+              omega = eigest - beta^2*cw/rhobar;
+
+              rho = sqrt(rhobar^2 + beta^2);
+              cw = rhobar/rho;
+              sw = beta/rho;
+
+              % Replacement
+              epsilonold = epsilon;
+              zetaold = zeta;
           end
           
-          % Continue QR
-          epsilon = s*beta;
-          deltabar = -c*beta;
-          
-          gamma = sqrt(gammabar^2 + beta^2);
-          c = gammabar/gamma;
-          s = beta/gamma;
-          
-          % Shifted QR
-          rhobar = sw*sigmabar - cw*(alpha - eigest);
-          sigmabar = -cw*beta;
-            
-          omega = eigest - beta^2*cw/rhobar;
-            
-          rho = sqrt(rhobar^2 + beta^2);
-          cw = rhobar/rho;
-          sw = beta/rho;
-            
-          % Replacement
-          epsilonold = epsilon;
-          zetaold = zeta;
-      end
       end
       
       deltacgold = deltacg;
