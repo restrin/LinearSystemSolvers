@@ -178,6 +178,12 @@ function [x, y, flag, it, normr, resvec, errvec] = ...
       vL = v;
   end
   
+  if( sigma > 0 )
+      tautilde = normb/sigma;
+      zetatilde = tautilde/sigma;
+      errvec(1) = sqrt(tautilde^2 + zetatilde^2);
+  end
+  
   anorm2 = alphaL;
 
   % Initial values
@@ -308,12 +314,11 @@ function [x, y, flag, it, normr, resvec, errvec] = ...
       wbar = s*wbar - c*p;
 
       yL = yL - zeta*w;
-      y  = yL - zetabar*wbar;
       normy2 = normy2 + zeta*zeta;
       
       % Check if should exit
       test0 = (normr <= atol*sqrt(anorm2) + btol*normb);
-      test1 = (it > maxit);
+      test1 = (it >= maxit);
       test4 = 0;
 %      test2 = (sigmax/sigmin >= conlim);
 
@@ -323,7 +328,7 @@ function [x, y, flag, it, normr, resvec, errvec] = ...
           c_list(ix) = c;
           z_list(ix) = zeta;
 
-          if it > d
+          if it >= d
               ix = mod(it-1,d)+1;
               jx = mod(ix,d)+1;
 
@@ -332,14 +337,14 @@ function [x, y, flag, it, normr, resvec, errvec] = ...
               theta = zetabark*theta ...
                   + abs(zetabark*zetabar*s_prod(ix)*s) ...
                   - zetabark^2;
-
-              errvec(it-d) = sqrt(errvec(it-d)^2 - 2*theta);
+              
+              errvec(it-d+1) = sqrt(errvec(it-d+1)^2 - 2*theta);
           end
-
+          
           ix = mod(it-1,d)+1;
-          if it < d
+          if it < d && d > 1
              s_prod(it+1:end) = s_prod(it+1:end)*s; 
-          else
+          elseif d > 1
              s_prod = s_prod/s_prod(mod(ix+1,d)+1);
              s_prod(mod(ix,d)+1) = s_prod(ix)*s; 
           end
@@ -353,12 +358,12 @@ function [x, y, flag, it, normr, resvec, errvec] = ...
           etatilde = omega*s;
           epstilde = -omega*c;
           zetatilde = (tautilde - etatilde*zeta)/epstilde;
-          
+
           err_y = sqrt(zetatilde^2 - zetabar^2);
           
           err = sqrt(err_x^2 + err_y^2);
 
-          errvec(it) = err;
+          errvec(it+1) = err;
           test4 = (err < etol * max(sqrt(normx2),1));
       end
 
@@ -377,4 +382,6 @@ function [x, y, flag, it, normr, resvec, errvec] = ...
       end
       it = it+1;  
   end
+  
+  y  = yL - zetabar*wbar;
 end
