@@ -257,34 +257,70 @@ function [x, xcg, flag, it, normr, normAr, resvec, resvecAr, errvec, errveccg, e
       n2Ar = norm([gamma*eps*zeta; delta*eta*zetaold]);
       resvecAr(it) = n2Ar;
       
+      % Transfer to CG point
+      xcg = x + zetabar*wbar;
+      normxcg = normx2 + zetabar^2;
+      
       % Sliding window part of error estimate
-      if( d > 0 && sigma > 0 )
-        if it <= d && d > 1 && it > 1
-           s_prod(it:end) = s_prod(it:end)*s_old;
-        end      
+%       if( d > 0 && sigma > 0 )
+%         if it < d && d > 1
+%            s_prod(it+1:end) = s_prod(it+1:end)*s;
+%         end      
+% 
+%         ix = mod(it-1,d) + 1;
+%         c_list(ix) = c;
+%         z_list(ix) = zeta;
+% 
+%         if it >= d
+%             jx = mod(it,d)+1;
+%             zetabark = z_list(jx)/c_list(jx); 
+% 
+%             theta = abs(c_list'*(s_prod.*z_list));
+%             theta = zetabark*theta ...
+%                 + abs(zetabark*zetabar*s_prod(ix)*s) ...
+%                 - zetabark^2;
+% 
+%             [it it-d+1 theta]
+%             
+%             errveccg(it-d+1) = sqrt(abs(errveccg(it-d+1)^2 - 2*theta));
+%         end
+% 
+%         ix = mod(it, d) + 1;
+%         if it >= d && d > 1
+%            s_prod = s_prod/s_prod(mod(ix, d) + 1);
+%            s_prod(ix) = s_prod(mod(ix-2, d)+1)*s;
+%         end
+%       end
 
-        if it > d
-            jx = mod(it-1,d)+1;
-            zetabark = z_list(jx)/c_list(jx); 
+      if d > 0 && sigma > 0          
+          ix = mod(it-1,d)+1;
+          
+          if it > d+1
+              jx = mod(ix-1,d)+1;
+              zetabark = z_list(jx)/c_list(jx); 
+              
+              pix = mod(it-2,d)+1;
+              theta = abs(c_list'*(s_prod.*z_list));
+              theta = zetabark*theta ...
+                  + abs(zetabark*zetabar*s_prod(pix)*s_old) ...
+                  - zetabark^2;
+              errveccg(it-d) = sqrt(errveccg(it-d)^2 - 2*theta);
 
-            theta = abs(c_list'*(s_prod.*z_list));
-            theta = zetabark*theta ...
-                + abs(zetabark*zetabar*s_prod(ix)*s_old) ...
-                - zetabark^2;
-            
-            errveccg(it-d) = sqrt(abs(errveccg(it-d)^2 - 2*theta));
-        end
-
-        ix = mod(it-1,d) + 1;
-        c_list(ix) = c;
-        z_list(ix) = zeta;
-        
-        ix = mod(it-1, d) + 1;
-        if it > d && d > 1
-           s_prod = s_prod/s_prod(mod(ix, d) + 1);
-           s_prod(ix) = s_prod(mod(ix-2, d)+1)*s_old;
-        end
-        s_old = s;
+              [it it-d+1 theta zetabark]
+          end
+          
+          c_list(ix) = c;
+          z_list(ix) = zeta;  
+          
+          ix = mod(it-2,d)+1;
+          if it < d && it > 1
+             s_prod(it+1:end) = s_prod(it+1:end)*s_old; 
+          elseif it > 1
+             s_prod = s_prod/s_prod(mod(ix+1,d)+1);
+             s_prod(mod(ix,d)+1) = s_prod(ix)*s_old; 
+          end
+          
+          s_old = s;
       end
 
       if( sigma > 0 )
@@ -342,9 +378,5 @@ function [x, xcg, flag, it, normr, normAr, resvec, resvecAr, errvec, errveccg, e
       it = it+1;
       
   end
-  
-  % Transfer to CG point
-  xcg = x + zetabar*wbar;
-  %normxcg = normx2 + zetabar^2;
   
 end
