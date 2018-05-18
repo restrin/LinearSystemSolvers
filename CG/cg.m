@@ -21,7 +21,7 @@ function [x, flag, iter, normr, resvec, errvec] = ...
 %   X = CG(A,B,ATOL,BTOL,ETOL,...,EIGEST,D) continues iterations until a
 %   certain forward error estimate is satisfied. Let X* be the solution
 %   then CG will exit when NORM(X*-X) <= ETOL. EIGEST must be an
-%   underestimate of the smallest eugenvalue of A. If the exact minimum
+%   underestimate of the smallest eigenvalue of A. If the exact minimum
 %   singular value is known (call it S), then EIGEST should be S*(1-ETA)
 %   where ETA is O(1e-10). D >= 0 is used to improve the error estimate,
 %   where at iteration K we tighten the error bound at iteration K-D with
@@ -72,7 +72,7 @@ function [x, flag, iter, normr, resvec, errvec] = ...
   elseif isa(A,'function_handle')
     explicitA = false;
   else
-    error('SOL:CG:Atype','%s','A must be numeric or a function handle');
+    error('CG:Atype','%s','A must be numeric or a function handle');
   end
   
   if nargin < 7  || isempty(M)
@@ -84,7 +84,7 @@ function [x, flag, iter, normr, resvec, errvec] = ...
   elseif isa(M,'function_handle')
     explicitM = false;
   else
-    error('SOL:LNLQ:Mtype','%s','M must be numeric or a function handle');
+    error('CG:Mtype','%s','M must be numeric or a function handle');
   end
   
   flag = 1;
@@ -241,7 +241,7 @@ function [x, flag, iter, normr, resvec, errvec] = ...
                       theta = zetabark*theta ...
                           + abs(zetabark*zetabar*s_prod(ix)*s) ...
                           - zetabark^2;
-
+                      
                       errvec(it-d) = sqrt(errvec(it-d)^2 - 2*theta);
                   end
 

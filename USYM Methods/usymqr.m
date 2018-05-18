@@ -10,7 +10,7 @@ function [x, istop, itn, rnorm, Anorm, Arnorm] = ...
     %   A(x,1) := A *x
     %   A(x,2) := A'*x
     %
-    % USYMLQ uses an iterative method to approximate the solution.
+    % USYMQR uses an iterative method to approximate the solution.
     % The number of iterations required to reach a certain accuracy
     % depends strongly on the scaling of the problem.  Poor scaling of
     % the rows or columns of A should therefore be avoided where possible.
